@@ -104,6 +104,36 @@ def jockeys():
     if out:
         save(OUT / "jockeys" / "all.json", {"updatedAt": int(datetime.datetime.now().timestamp() * 1000), "source": "getcurrentjockeyinfo", "jockeys": out})
 
+def trainers():
+    """조교사 성적: API19_1(조교사 상세정보) 후보 주소를 차례로 시도, 안 되면 API27_1 통산기록(pr_gubun=2). 원본 항목을 그대로 저장."""
+    found = None
+    for op in ["API19_1/trainerInfo_1", "API19_1/trainerInfo", "API19_1/getTrainerInfo", "API19_1/currentTrainerInfo"]:
+        items = []
+        try:
+            for m in MEETS:
+                for it in get(op, meet=m, numOfRows=300):
+                    it["_meet"] = m
+                    items.append(it)
+        except Exception as e:
+            print("trainer try", op, "failed:", str(e)[:80]); items = []
+        if items:
+            found = (op, items); break
+    if not found:
+        items = []
+        try:
+            for m in MEETS:
+                for it in get("API27_1/totalRecord_1", meet=m, pr_gubun=2, numOfRows=300):
+                    it["_meet"] = m
+                    items.append(it)
+        except Exception as e:
+            print("trainer totalRecord failed:", str(e)[:80])
+        if items:
+            found = ("API27_1/totalRecord_1", items)
+    if found:
+        save(OUT / "trainers" / "all.json", {"updatedAt": int(datetime.datetime.now().timestamp() * 1000), "source": found[0], "items": found[1]})
+    else:
+        print("trainers: nothing fetched")
+
 if __name__ == "__main__":
     dates = sys.argv[1:] or [TODAY]
     for d in dates:
@@ -112,4 +142,8 @@ if __name__ == "__main__":
         jockeys()
     except Exception as e:
         print("jockeys failed:", e)
+    try:
+        trainers()
+    except Exception as e:
+        print("trainers failed:", e)
     results()
